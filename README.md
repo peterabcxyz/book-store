@@ -61,8 +61,77 @@ spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
 # Enable H2 Console (only for development)
 spring.h2.console.enabled=true
 spring.h2.console.path=/h2-console
+```
+
+## High level Design
+#### 1. Component Interaction Diagram
+Below is a simplified representation of the component interaction diagram:
+
+```properties
++-----------------------------------------------------+
+|                Book Store Application               |
++-----------------------------------------------------+
+|                                                     |
+|   +----------------+    +----------------+          |
+|   |   Client       |    |   Swagger UI   |          |
+|   | (Browser/App)  |    | (API Docs)     |          |
+|   +----------------+    +----------------+          |
+|          |                       |                  |
+|          | HTTP Requests         |                  |
+|          v                       v                  |
+|   +-----------------------------+                   |
+|   |    REST Controllers         |                   |
+|   | (Book, Cart, Purchase)      |                   |
+|   +-----------------------------+                   |
+|          |                                          |
+|          v                                          |
+|   +-----------------------------+                   |
+|   |    Service Layer            |                   |
+|   | (BookService, CartService,  |                   |
+|   |  PurchaseService, Payment)  |                   |
+|   +-----------------------------+                   |
+|          |                                          |
+|          v                                          |
+|   +-----------------------------+                   |
+|   |    Repositories (JPA)       |                   |
+|   | (Book, Cart, Purchase)      |                   |
+|   +-----------------------------+                   |
+|          |                                          |
+|          v                                          |
+|   +-----------------------------+                   |
+|   |    Database (H2)            |                   |
+|   | (Books, Carts, Purchases)   |                   |
+|   +-----------------------------+                   |
+|                                                     |
++-----------------------------------------------------+
+```
+
+#### 2. Domain Model Relationship Diagram
+Below is a simplified representation of the domain relationships:
+```properties
++----------+       +----------+       +----------+
+|   Book   |<--+---| CartItem |---+-->|   Cart   |
++----------+   |   +----------+   |   +----------+
+| id       |   |   | id       |   |   | id       |
+| title    |   |   | book     |   |   | userId   |
+| genre    |   |   | quantity |   |   | items    |
+| isbn     |   |   | cart     |   |   +----------+
+| author   |   |   +----------+   |
+| pubYear  |   |                  |
+| price    |   |   +----------+   |
+| qtyStock |   +-->|PurchaseItm|   |
++----------+       +----------+   |   +----------+
+| id       |   +-->| Purchase |
+| book     |       +----------+
+| quantity |       | id       |
++----------+       | userId   |
+| purchDate|
+| items    |
+| payMethod|
++----------+
 
 ```
+
 ## Setup Instructions:
 1. Clone the repository:
 ```properties
