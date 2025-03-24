@@ -66,7 +66,7 @@ spring.h2.console.path=/h2-console
 ## Setup Instructions:
 1. Clone the repository:
 ```properties
-git clone <repository-url>
+git clone https://github.com/peterabcxyz/book-store.git
 cd book-store
 ```
 
@@ -111,7 +111,7 @@ java -jar target/book-store-0.0.1-SNAPSHOT.jar
 ### 3. Verify the Application is Running:
 Open a browser or use curl to check if the application is running:
 ```properties
-curl http://localhost:8080
+curl http://localhost:8080/api/inventories/search
 ```
 Alternatively, explore and test the endpoints directly from the browser via Swagger UI
 ```properties
@@ -127,4 +127,3 @@ URL: http://localhost:8080/h2-console
 
 ### 5. Stop the Application:
 Press Control + C (not Ctrl + C, as macOS uses the Control key) in the terminal window where the application is running.
-# book-store

@@ -1,67 +1,126 @@
 package com.interswitch.bookstore.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interswitch.bookstore.enums.Genre;
+import com.interswitch.bookstore.enums.PaymentMethod;
+import com.interswitch.bookstore.exceptions.NotFoundException;
 import com.interswitch.bookstore.requests.PurchaseCheckoutDTO;
-import com.interswitch.bookstore.responses.ApiResponse;
+import com.interswitch.bookstore.responses.BookDTO;
 import com.interswitch.bookstore.responses.PurchaseDTO;
+import com.interswitch.bookstore.responses.PurchaseItemDTO;
 import com.interswitch.bookstore.services.PurchaseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
+import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(PurchaseController.class)
 class PurchaseControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private PurchaseService purchaseService;
 
-    @InjectMocks
-    private PurchaseController controller;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private PurchaseDTO purchaseDTO;
-    private PurchaseCheckoutDTO checkoutDTO;
 
     @BeforeEach
     void setUp() {
-        purchaseDTO = new PurchaseDTO();
-        purchaseDTO.setUserId(1L);
+        BookDTO bookDTO = new BookDTO();
+        bookDTO.setId(1L);
+        bookDTO.setTitle("Test Book");
+        bookDTO.setGenre(Genre.FICTION);
 
-        checkoutDTO = new PurchaseCheckoutDTO();
+        purchaseDTO = new PurchaseDTO();
+        purchaseDTO.setId(1L);
+        purchaseDTO.setUserId(1L);
+        purchaseDTO.setPaymentMethod(PaymentMethod.WEB);
+        PurchaseItemDTO purchaseItemDTO = new PurchaseItemDTO();
+        purchaseItemDTO.setBook(bookDTO);
+        purchaseItemDTO.setQuantity(2);
+        purchaseDTO.setItems(Collections.singletonList(purchaseItemDTO));
     }
 
     @Test
-    void getPurchaseHistory_success() {
-        Page<PurchaseDTO> purchasePage = new PageImpl<>(List.of(purchaseDTO));
+    void getPurchaseHistory_Success() throws Exception {
+        Page<PurchaseDTO> purchasePage = new PageImpl<>(Collections.singletonList(purchaseDTO));
         when(purchaseService.getPurchaseHistory(eq(1L), any())).thenReturn(purchasePage);
 
-        ResponseEntity<ApiResponse<?>> response = controller.getPurchaseHistory(1L, 0, 10, "createdAt", "desc");
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(purchasePage, response.getBody().data());
-        verify(purchaseService).getPurchaseHistory(eq(1L), any());
+        mockMvc.perform(get("/api/purchases/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.content[0].userId").value(1));
     }
 
     @Test
-    void checkout_success() {
-        when(purchaseService.checkout(checkoutDTO)).thenReturn(purchaseDTO);
+    void getPurchaseHistory_NotFound() throws Exception {
+        when(purchaseService.getPurchaseHistory(eq(1L), any()))
+                .thenThrow(new NotFoundException("Purchase history not found"));
 
-        ResponseEntity<ApiResponse<?>> response = controller.checkout(checkoutDTO);
+        mockMvc.perform(get("/api/purchases/1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("Purchase history not found"));
+    }
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(purchaseDTO, response.getBody().data());
-        verify(purchaseService).checkout(checkoutDTO);
+    @Test
+    void checkout_Success() throws Exception {
+        PurchaseCheckoutDTO request = new PurchaseCheckoutDTO();
+        request.setUserId(1L);
+        request.setPaymentMethod(PaymentMethod.WEB);
+
+        when(purchaseService.checkout(any(PurchaseCheckoutDTO.class))).thenReturn(purchaseDTO);
+
+        mockMvc.perform(post("/api/purchases/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.userId").value(1));
+    }
+
+    @Test
+    void checkout_NotFound() throws Exception {
+        PurchaseCheckoutDTO request = new PurchaseCheckoutDTO();
+        request.setUserId(1L);
+        request.setPaymentMethod(PaymentMethod.WEB);
+
+        when(purchaseService.checkout(any())).thenThrow(new NotFoundException("Cart not found"));
+
+        mockMvc.perform(post("/api/purchases/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("Cart not found"));
+    }
+
+    @Test
+    void checkout_BadRequest_InvalidPaymentMethod() throws Exception {
+        PurchaseCheckoutDTO request = new PurchaseCheckoutDTO();
+        request.setUserId(1L);
+        request.setPaymentMethod(null); // Invalid payment method
+
+        mockMvc.perform(post("/api/purchases/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
     }
 }
